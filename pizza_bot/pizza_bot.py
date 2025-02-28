@@ -1,95 +1,84 @@
-import datetime
+import datetime as dt
 import cv2
 from ultralytics import YOLO
 import discord
 from discord.ext import tasks
 
-# botのトークンと各種ID 必要に応じて変更する
-TOKEN = "YOUR_TOKEN"
-CHANNEL_ID = 000000000000000000
-MASTER_ID = 000000000000000000
-TOMMY_ID = 000000000000000000
-
+# 初期設定部分
+TOKEN = ""
 
 intents = discord.Intents.default()
 intents.message_content = True
 
+CHANNEL_ID = 0
+MASTER_ID = 0
+TOMMY_ID = 0
 
 # YOLOの準備
 model = YOLO('yolov8n.pt')
 
 # 本体
 client = discord.Client(intents=intents)
-
-
-# ログイン時処理
 @client.event
 async def on_ready():
-    loop.start() # loop開始
+    loop.start()
     print("ログインしました")
     channel = client.get_channel(CHANNEL_ID)
     await channel.send('こんにちは，pizza_botです！\n誰かがピザを食べた場合全員に通知します．')
 
-
-# 毎月はじめに先月のまとめを送信し，historyを記録する
+# 毎日午前2:55に自爆する部分
 @tasks.loop(seconds=60)
 async def loop():
-    # 現在の時刻を取得
-    year = datetime.now().strftime('%y')
-    month = datetime.now().strftime('%m')
-    date = datetime.now().strftime('%d')
-    now = datetime.now().strftime('%H:%M')
-    if now == '00:00' and date == "1":
-        # 月の変わり目をお知らせ
+    # 現在の時刻
+    year = dt.datetime.now().strftime('%y')
+    month = dt.datetime.now().strftime('%m')
+    date = dt.datetime.now().strftime('%d')
+    now = dt.datetime.now().strftime('%H:%M')
+    # print(date)
+    if now == '00:00' and date == "01":
         channel = client.get_channel(CHANNEL_ID)
         await channel.send(f"{month}月になりました！")
-
         # historyを開く
         f_history = open("./past_data/history.txt", "a",encoding="UTF-8")
-
         # 先月の出費を出力
         f_total_price = open("./past_data/total_price.txt")
-        await channel.send(f"先月の累計出費: {f_total_price.readline()}円")
-
-        # 先月の情報を登録　先月が何年何月か取得する
-        last_month = int(month) - 1
-        if last_month == 0:
-            last_month = 12
+        price = f_total_price.readline()
+        await channel.send(f"先月の累計出費: {price}円")
+        # 先月の情報を登録　month - 1してアレする
+        month = int(month) - 1
+        if month == 0:
+            month = 12
             year = str(int(year) - 1)
-
-        # hitory.txt書き込み
-        f_history.write(f"{year}年{last_month}月 {f_total_price.readline()}円 ")
+        month = str(month)
+        # hitory書き込み
+        f_history.write(f"{year}年{month}月 {price}円 ")
         f_total_price.close()
-
-        # total_price.txtの数字をリセットする
+        # ファイルの数字をリセットする
         f_total_price = open("./past_data/total_price.txt", "w")
         f_total_price.write("0")
         f_total_price.close()
 
-        # 先月のピザ枚数をお知らせ
+        # 先月のピザ枚数を出力
         f_total_pizza = open("./past_data/total_pizza.txt")
-        await channel.send(f"先月のピザ枚数: {f_total_pizza.readline()}枚")
+        pizza_count = f_total_pizza.readline()
 
-        # history.txt書き込み
-        f_history.write(f"{f_total_pizza.readline()}枚\n")
+        await channel.send(f"先月のピザ枚数: {pizza_count}枚")
+        f_history.write(f"{pizza_count}枚\n")
         f_total_pizza.close()
-
         # ファイルの数字をリセットする
         f_total_pizza = open("./past_data/total_pizza.txt", 'w')
         f_total_pizza.write("0")
         f_total_pizza.close()
-
         f_history.close()
+        print("送った")
 
 
-# 種々の投稿への対応
 @client.event
 async def on_message(message):
-
-    # bot自身の投稿は無視する
     if message.author.bot:
         return
     
+
     # コマンド対応
     if message.content == "p!hello":
         await message.channel.send("こんにちは，pizza_botです！\n"\
@@ -102,22 +91,18 @@ async def on_message(message):
                                     "   p!prediction: 最新画像の分類結果を表示\n"\
                                     "   p!history: これまでの出費とピザ枚数を月ごとに表示\n"\
                                     "これらのコマンドは私のプロフィール欄でいつでも見ることが出来ます．")
-        
     if message.content == "p!total":
         f_total_price = open("./past_data/total_price.txt")
         await message.channel.send(f"今月の累計出費: {f_total_price.readline()}円")
         f_total_price.close()
-
     if message.content == "p!pizza":
         f_total_pizza = open("./past_data/total_pizza.txt")
         await message.channel.send(f"今月の累計ピザ回数: {f_total_pizza.readline()}枚")
         f_total_pizza.close()
-
     if message.content == "p!lastpizza":
         f_last_pizza_date = open("./past_data/last_pizza_date.txt")
         await message.channel.send(f"最後にピザを食べた日: {f_last_pizza_date.readline()}")
         f_last_pizza_date.close()
-
     if message.content == "p!prediction":
         f_past_prediction = open("./past_data/past_prediction.txt")
         predictions = []
@@ -126,14 +111,12 @@ async def on_message(message):
         f_past_prediction.close()
         await message.channel.send(f"直近の分類結果: {predictions[-1]}")
         await message.channel.send(file=discord.File("./picture/prediction.png"))
-
     if message.content == "p!history":
         f_history = open("./past_data/history.txt", encoding="UTF-8")
         await message.channel.send("ピザ履歴\n")
         await message.channel.send(f_history.read())
 
-
-    # 家計簿をつける処理(マスター権限をもつ人間のみ有効)
+    # 家計簿をつける処理
     if message.content.endswith("円") and message.author.id == MASTER_ID:
         price = int(message.content[:-1])
         f = open("./past_data/total_price.txt", 'r')
@@ -177,7 +160,7 @@ async def on_message(message):
                             f_total_pizza.close()
                             # 最後にピザを食べた日を更新
                             f_last_pizza_date = open("./past_data/last_pizza_date.txt", "w")
-                            d_today = datetime.date.today()
+                            d_today = dt.date.today()
                             f_last_pizza_date.write(f"{d_today.year}-{d_today.month}-{d_today.day}")
                             f_last_pizza_date.close()
                             f_total_price = open("./past_data/total_price.txt")
