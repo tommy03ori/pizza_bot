@@ -12,7 +12,6 @@ intents.message_content = True
 
 CHANNEL_ID = 0
 MASTER_ID = 0
-TOMMY_ID = 0
 
 # YOLOの準備
 model = YOLO('yolov8n.pt')
